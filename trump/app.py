@@ -7,7 +7,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 app = Flask(__name__)
-app.secret_key = 'trump123'  # Set a secure secret key
+# Generate a secure secret key - use environment variable in production
+app.secret_key = os.environ.get('SECRET_KEY') or os.urandom(32)
 
 # Configure the SQLite database
 db_path = os.path.join(os.path.dirname(__file__), 'trump.db')
