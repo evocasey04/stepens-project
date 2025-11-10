@@ -3,6 +3,7 @@ import sqlite3
 from flask import Flask, render_template, request, Response, redirect, url_for, flash, session, send_from_directory, abort, send_file
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 app = Flask(__name__)
@@ -140,10 +141,10 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        query = text("SELECT * FROM users WHERE username = :username AND password = :password")
-        user = db.session.execute(query, {'username': username, 'password': password}).fetchone()
+        query = text("SELECT * FROM users WHERE username = :username")
+        user = db.session.execute(query, {'username': username}).fetchone()
 
-        if user:
+        if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
             flash('Login successful!', 'success')
             return redirect(url_for('profile', user_id=user.id))
@@ -152,6 +153,34 @@ def login():
             return render_template('login.html', error=error)
 
     return render_template('login.html')
+
+# Add registration route
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        # Check if username already exists
+        check_query = text("SELECT * FROM users WHERE username = :username")
+        existing_user = db.session.execute(check_query, {'username': username}).fetchone()
+        
+        if existing_user:
+            error = 'Username already exists. Please choose a different one.'
+            return render_template('register.html', error=error)
+        
+        # Hash the password before storing
+        hashed_password = generate_password_hash(password)
+        
+        # Insert new user with hashed password
+        insert_query = text("INSERT INTO users (username, password) VALUES (:username, :password)")
+        db.session.execute(insert_query, {'username': username, 'password': hashed_password})
+        db.session.commit()
+        
+        flash('Registration successful! Please log in.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
 
 
 
