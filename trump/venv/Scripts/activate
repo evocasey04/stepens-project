@@ -35,7 +35,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\evanc\Documents\y3\secure progamming\assignment 1\trump\venv"
+VIRTUAL_ENV="C:\Users\evanc\Documents\GitHub\stepens-project\trump\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
