@@ -115,15 +115,28 @@ def download_page():
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
 def profile(user_id):
-    query_user = text("SELECT * FROM users WHERE id = :user_id")
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash('Please log in to view this page.', 'error')
+        return redirect(url_for('login'))
+        
+    # Check if the requested profile belongs to the logged-in user
+    if session['user_id'] != user_id:
+        # Log unauthorized access attempt
+        app.logger.warning(f'Unauthorized access attempt: User {session["user_id"]} tried to access profile {user_id}')
+        return "You are not authorized to view this profile.", 403
+    
+    # Get user data
+    query_user = text("SELECT id, username FROM users WHERE id = :user_id")
     user = db.session.execute(query_user, {'user_id': user_id}).fetchone()
 
     if user:
+        # Only fetch cards if the user is authorized to see them
         query_cards = text("SELECT * FROM carddetail WHERE id = :user_id")
         cards = db.session.execute(query_cards, {'user_id': user_id}).fetchall()
         return render_template('profile.html', user=user, cards=cards)
     else:
-        return "User not found or unauthorized access.", 403
+        return "User not found.", 404
 from flask import request
 
 @app.route('/search', methods=['GET'])
