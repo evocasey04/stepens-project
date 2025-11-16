@@ -52,15 +52,35 @@ def sitemap():
     
 @app.route('/admin_panel')
 def admin_panel():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
     return render_template('admin_panel.html')
 
 # Route to handle redirects based on the destination query parameter
 @app.route('/redirect', methods=['GET'])
 def redirect_handler():
     destination = request.args.get('destination')
-
+    
+    # Fix open redirect vulnerability - only allow internal redirects
     if destination:
-        return redirect(destination)
+        # First check for malicious patterns - block immediately
+        if ('://' in destination or destination.startswith('//') or 
+            destination.startswith('javascript:') or destination.startswith('data:') or
+            destination.startswith('mailto:') or destination.startswith('tel:')):
+            return redirect(url_for('index'))
+        
+        # Whitelist of allowed internal paths
+        allowed_paths = ['/quotes', '/sitemap', '/comments', '/profile', '/login', '/register', '/']
+        
+        # Only allow paths that start with '/' and are in whitelist OR start with '/'
+        if destination.startswith('/') and destination in allowed_paths:
+            return redirect(destination)
+        elif destination.startswith('/') and not ('.' in destination or '//' in destination):
+            # Allow other internal paths but be restrictive
+            return redirect(destination)
+        
+        # If not allowed, redirect to safe default
+        return redirect(url_for('index'))
     else:
         return "Invalid destination", 400
 
@@ -84,6 +104,11 @@ def comments():
 
 @app.route('/download', methods=['GET'])
 def download():
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash('Please log in to download files.', 'error')
+        return redirect(url_for('login'))
+    
     # Get the filename from the query parameter
     file_name = request.args.get('file', '')
 
@@ -110,6 +135,11 @@ def download():
         
 @app.route('/downloads', methods=['GET'])
 def download_page():
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash('Please log in to access downloads.', 'error')
+        return redirect(url_for('login'))
+    
     return render_template('download.html')
 
 
@@ -180,8 +210,9 @@ def register():
         existing_user = db.session.execute(check_query, {'username': username}).fetchone()
         
         if existing_user:
-            error = 'Username already exists. Please choose a different one.'
-            return render_template('register.html', error=error)
+            # Don't reveal that username exists - show generic success message
+            flash('Registration request received. If the username is available, an account will be created.', 'info')
+            return redirect(url_for('login'))
         
         # Hash the password before storing
         hashed_password = generate_password_hash(password)
@@ -191,7 +222,7 @@ def register():
         db.session.execute(insert_query, {'username': username, 'password': hashed_password})
         db.session.commit()
         
-        flash('Registration successful! Please log in.', 'success')
+        flash('Registration request received. If the username is available, an account will be created.', 'info')
         return redirect(url_for('login'))
     
     return render_template('register.html')
@@ -214,4 +245,4 @@ if __name__ == '__main__':
     initialize_database()  # Initialize the database on application startup if it doesn't exist
     with app.app_context():
         db.create_all()  # Create tables based on models if they don't already exist
-    app.run(debug=True, port=5001)
+    app.run(debug=False, port=5001)
